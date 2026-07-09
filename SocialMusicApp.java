@@ -215,8 +215,9 @@ public class SocialMusicApp extends JFrame {
     private DLLNode currentPlayingNode = null;
 
     private JLabel lblSelTitle, lblSelArtist, lblSelGenre;
-    private JLabel lblTitle;
+    private JLabel lblTitle, lblSubtitle;
     private JButton btnPlayPause;
+    private JButton btnSidebarDashboard, btnSidebarPlaylist, btnSidebarQueue;
     private DefaultTableModel playlistModel, queueModel;
     private DefaultListModel<Song> dashboardListModel = new DefaultListModel<>();
     private JComboBox<String> fF;
@@ -242,6 +243,7 @@ public class SocialMusicApp extends JFrame {
         if (!catalog.isEmpty()) {
             selectSong(catalog.get(0));
         }
+        updateSidebarBadges();
         setVisible(true);
     }
 
@@ -332,6 +334,13 @@ public class SocialMusicApp extends JFrame {
         for (Song s : catalog) dashboardListModel.addElement(s);
     }
 
+    private void updateSidebarBadges() {
+        if (btnSidebarPlaylist != null && btnSidebarQueue != null) {
+            btnSidebarPlaylist.setText("DLL Playlist (" + activePlaylist.toList().size() + ")");
+            btnSidebarQueue.setText("FIFO Queue (" + playQueue.toList().size() + ")");
+        }
+    }
+
     private JPanel createSidebar() {
         JPanel p = new JPanel(); p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
         p.setBackground(COLOR_SIDEBAR); p.setPreferredSize(new Dimension(170, 500));
@@ -341,11 +350,15 @@ public class SocialMusicApp extends JFrame {
         title.setBorder(BorderFactory.createEmptyBorder(20,15,20,15));
         p.add(title);
 
-        String[] items = {"Dashboard", "DLL Playlist", "FIFO Queue"};
+        btnSidebarDashboard = new JButton("Dashboard");
+        btnSidebarPlaylist = new JButton("DLL Playlist (0)");
+        btnSidebarQueue = new JButton("FIFO Queue (0)");
+
+        JButton[] buttons = {btnSidebarDashboard, btnSidebarPlaylist, btnSidebarQueue};
         String[] cards = {"DASHBOARD", "PLAYLIST", "QUEUE"};
-        for (int i = 0; i < items.length; i++) {
+        for (int i = 0; i < buttons.length; i++) {
             final String card = cards[i];
-            JButton btn = new JButton(items[i]);
+            JButton btn = buttons[i];
             btn.setBackground(COLOR_SIDEBAR); btn.setForeground(COLOR_MUTED);
             btn.setFocusPainted(false); btn.setAlignmentX(Component.LEFT_ALIGNMENT);
             btn.setFont(new Font("Segoe UI", Font.BOLD, 12));
@@ -441,7 +454,17 @@ public class SocialMusicApp extends JFrame {
         btnAddPlaylist.addActionListener(e -> {
             Song s = list.getSelectedValue();
             if (s != null) {
+                // Duplicate prevention
+                boolean exists = false;
+                for (Song existing : activePlaylist.toList()) {
+                    if (existing.id == s.id) { exists = true; break; }
+                }
+                if (exists) {
+                    JOptionPane.showMessageDialog(this, "Song is already in the playlist!");
+                    return;
+                }
                 activePlaylist.add(s);
+                updateSidebarBadges();
                 JOptionPane.showMessageDialog(this, "Added to DLL Playlist!");
             }
         });
@@ -450,6 +473,7 @@ public class SocialMusicApp extends JFrame {
             Song s = list.getSelectedValue();
             if (s != null) {
                 playQueue.enqueue(s);
+                updateSidebarBadges();
                 JOptionPane.showMessageDialog(this, "Added to FIFO Play Queue!");
             }
         });
@@ -496,10 +520,32 @@ public class SocialMusicApp extends JFrame {
         for (Song s : catalog) fF.addItem(s.filename);
         JButton addBtn = new JButton("Add Song"); styleBtn(addBtn);
         addBtn.addActionListener(e -> {
-            if (fT.getText().isEmpty() || fA.getText().isEmpty()) return;
-            Song s = new Song(catalog.size()+1, fT.getText(), fA.getText(), fG.getText(), (String)fF.getSelectedItem());
-            catalog.add(s); activePlaylist.add(s); refreshPlaylist();
-            refreshDashboardList();
+            String t = fT.getText().trim();
+            String a = fA.getText().trim();
+            String g = fG.getText().trim();
+            if (t.isEmpty() || a.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "Title and Artist cannot be empty!");
+                return;
+            }
+            // Duplicate prevention
+            for (Song existing : activePlaylist.toList()) {
+                if (existing.title.equalsIgnoreCase(t) && existing.artist.equalsIgnoreCase(a)) {
+                    JOptionPane.showMessageDialog(this, "This song is already in the playlist!");
+                    return;
+                }
+            }
+            
+            Song s = new Song(catalog.size()+1, t, a, g, (String)fF.getSelectedItem());
+            boolean inCatalog = false;
+            for (Song cat : catalog) {
+                if (cat.title.equalsIgnoreCase(t) && cat.artist.equalsIgnoreCase(a)) { inCatalog = true; break; }
+            }
+            if (!inCatalog) {
+                catalog.add(s);
+                refreshDashboardList();
+            }
+            activePlaylist.add(s);
+            refreshPlaylist();
             fT.setText(""); fA.setText(""); fG.setText("");
         });
         
@@ -538,8 +584,14 @@ public class SocialMusicApp extends JFrame {
         JPanel p = new JPanel(new BorderLayout(15, 5)); p.setBackground(COLOR_SIDEBAR);
         p.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
         
+        JPanel infoPanel = new JPanel(); infoPanel.setLayout(new BoxLayout(infoPanel, BoxLayout.Y_AXIS));
+        infoPanel.setOpaque(false);
+
         lblTitle = new JLabel("Not Playing"); styleLabel(lblTitle, new Font("Segoe UI", Font.BOLD, 13), COLOR_TEXT);
-        p.add(lblTitle, BorderLayout.WEST);
+        lblSubtitle = new JLabel(""); styleLabel(lblSubtitle, new Font("Segoe UI", Font.PLAIN, 10), COLOR_MUTED);
+        
+        infoPanel.add(lblTitle); infoPanel.add(lblSubtitle);
+        p.add(infoPanel, BorderLayout.WEST);
 
         JPanel centerControls = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0)); centerControls.setOpaque(false);
         JButton btnPrev = new JButton("⏮ Previous"); styleBtn(btnPrev);
@@ -552,6 +604,7 @@ public class SocialMusicApp extends JFrame {
             if (cur != null) {
                 player.stop();
                 lblTitle.setText("Stopped");
+                lblSubtitle.setText("");
                 btnPlayPause.setText("Play");
             } else if (selectedSong != null) {
                 play(selectedSong);
@@ -580,7 +633,8 @@ public class SocialMusicApp extends JFrame {
         if (s == null) return;
         player.play(s);
         currentPlayingNode = activePlaylist.findNode(s);
-        lblTitle.setText("Playing: " + s.title);
+        lblTitle.setText(s.title);
+        lblSubtitle.setText(s.artist + " • " + s.genre);
         btnPlayPause.setText("Pause");
     }
 
@@ -620,6 +674,7 @@ public class SocialMusicApp extends JFrame {
         for (int i = 0; i < list.size(); i++) {
             Song s = list.get(i); playlistModel.addRow(new Object[]{i+1, s.title, s.artist, s.genre, s.filename});
         }
+        updateSidebarBadges();
     }
 
     private void refreshQueue() {
@@ -627,6 +682,7 @@ public class SocialMusicApp extends JFrame {
         for (int i = 0; i < list.size(); i++) {
             Song s = list.get(i); queueModel.addRow(new Object[]{i+1, s.title, s.artist});
         }
+        updateSidebarBadges();
     }
 
     public static void main(String[] args) {
