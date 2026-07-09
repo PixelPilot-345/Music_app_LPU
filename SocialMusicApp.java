@@ -214,7 +214,6 @@ public class SocialMusicApp extends JFrame {
     private DefaultTableModel playlistModel, queueModel;
     private DefaultListModel<Song> dashboardListModel = new DefaultListModel<>();
     private DefaultListModel<Song> recListModel = new DefaultListModel<>();
-    private JComboBox<String> fF;
     private JLabel lblRecFor;
 
     public SocialMusicApp() {
@@ -326,8 +325,8 @@ public class SocialMusicApp extends JFrame {
             }
         }
 
-        for (int i = 0; i < Math.min(4, catalog.size()); i++) {
-            activePlaylist.add(catalog.get(i));
+        for (Song s : catalog) {
+            activePlaylist.add(s);
         }
 
         refreshDashboardList();
@@ -561,48 +560,30 @@ public class SocialMusicApp extends JFrame {
         }
         
         JPanel inputPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5)); inputPanel.setOpaque(false);
-        JTextField fT = new JTextField(8); JTextField fA = new JTextField(8); JTextField fG = new JTextField(6);
-        fF = new JComboBox<>();
-        for (Song s : catalog) fF.addItem(s.filename);
-        JButton addBtn = new JButton("Add Song"); styleBtn(addBtn);
+        JLabel lblSelect = new JLabel("Quick Add Song:"); styleLabel(lblSelect, new Font("Segoe UI", Font.PLAIN, 12), COLOR_TEXT);
+        
+        JComboBox<Song> cbPlaylistSongs = new JComboBox<>();
+        for (Song s : catalog) cbPlaylistSongs.addItem(s);
+        cbPlaylistSongs.setBackground(COLOR_PANEL); cbPlaylistSongs.setForeground(COLOR_TEXT);
+        
+        JButton addBtn = new JButton("Add to Playlist"); styleBtn(addBtn);
         addBtn.addActionListener(e -> {
-            String t = fT.getText().trim();
-            String a = fA.getText().trim();
-            String g = fG.getText().trim();
-            if (t.isEmpty() || a.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "Title and Artist cannot be empty!");
-                return;
-            }
-            for (Song existing : activePlaylist.toList()) {
-                if (existing.title.equalsIgnoreCase(t) && existing.artist.equalsIgnoreCase(a)) {
-                    JOptionPane.showMessageDialog(this, "This song is already in the playlist!");
+            Song s = (Song) cbPlaylistSongs.getSelectedItem();
+            if (s != null) {
+                boolean exists = false;
+                for (Song existing : activePlaylist.toList()) {
+                    if (existing.id == s.id) { exists = true; break; }
+                }
+                if (exists) {
+                    JOptionPane.showMessageDialog(this, "Song is already in the playlist!");
                     return;
                 }
+                activePlaylist.add(s);
+                refreshPlaylist();
             }
-            
-            Song s = new Song(catalog.size()+1, t, a, g, (String)fF.getSelectedItem());
-            boolean inCatalog = false;
-            for (Song cat : catalog) {
-                if (cat.title.equalsIgnoreCase(t) && cat.artist.equalsIgnoreCase(a)) { inCatalog = true; break; }
-            }
-            if (!inCatalog) {
-                catalog.add(s);
-                recGraph.addSong(s);
-                refreshDashboardList();
-            }
-            activePlaylist.add(s);
-            refreshPlaylist();
-            fT.setText(""); fA.setText(""); fG.setText("");
         });
         
-        JLabel lT = new JLabel("Title:"); styleLabel(lT, new Font("Segoe UI", Font.PLAIN, 12), COLOR_TEXT);
-        JLabel lA = new JLabel("Artist:"); styleLabel(lA, new Font("Segoe UI", Font.PLAIN, 12), COLOR_TEXT);
-        JLabel lG = new JLabel("Genre:"); styleLabel(lG, new Font("Segoe UI", Font.PLAIN, 12), COLOR_TEXT);
-        
-        inputPanel.add(lT); inputPanel.add(fT);
-        inputPanel.add(lA); inputPanel.add(fA);
-        inputPanel.add(lG); inputPanel.add(fG);
-        inputPanel.add(fF); inputPanel.add(addBtn);
+        inputPanel.add(lblSelect); inputPanel.add(cbPlaylistSongs); inputPanel.add(addBtn);
 
         JPanel south = new JPanel(new BorderLayout(5, 5)); south.setOpaque(false);
         south.add(controls, BorderLayout.NORTH); south.add(inputPanel, BorderLayout.SOUTH);
@@ -618,11 +599,34 @@ public class SocialMusicApp extends JFrame {
         JTable table = new JTable(queueModel); styleTable(table);
         p.add(new JScrollPane(table), BorderLayout.CENTER);
 
+        JPanel south = new JPanel(new BorderLayout(5, 5)); south.setOpaque(false);
+        
+        JPanel inputPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5)); inputPanel.setOpaque(false);
+        JLabel lblSelect = new JLabel("Quick Add Song:"); styleLabel(lblSelect, new Font("Segoe UI", Font.PLAIN, 12), COLOR_TEXT);
+        
+        JComboBox<Song> cbQueueSongs = new JComboBox<>();
+        for (Song s : catalog) cbQueueSongs.addItem(s);
+        cbQueueSongs.setBackground(COLOR_PANEL); cbQueueSongs.setForeground(COLOR_TEXT);
+        
+        JButton addBtn = new JButton("Add to Queue"); styleBtn(addBtn);
+        addBtn.addActionListener(e -> {
+            Song s = (Song) cbQueueSongs.getSelectedItem();
+            if (s != null) {
+                playQueue.enqueue(s);
+                refreshQueue();
+            }
+        });
+        inputPanel.add(lblSelect); inputPanel.add(cbQueueSongs); inputPanel.add(addBtn);
+
         JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT)); controls.setOpaque(false);
         JButton dequeueBtn = new JButton("Play Next in Queue"); styleBtn(dequeueBtn);
         dequeueBtn.addActionListener(e -> playNext());
         controls.add(dequeueBtn);
-        p.add(controls, BorderLayout.SOUTH);
+        
+        south.add(inputPanel, BorderLayout.WEST);
+        south.add(controls, BorderLayout.EAST);
+        
+        p.add(south, BorderLayout.SOUTH);
         return p;
     }
 
