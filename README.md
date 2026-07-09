@@ -21,12 +21,12 @@ This project simulates a 4-person development team. Each member designed and imp
 ### 3. Song Search (Binary Search) — **Student 3**
 * **Class**: `BinarySearch`
 * **Purpose**: Enables rapid searching of the song catalog by title.
-* **Why Binary Search**: Operates in $O(\log N)$ logarithmic time. Since Binary Search requires a sorted collection, it works collaboratively with Student 4's sorting system.
+* **Why Binary Search**: Operates in $O(\log N)$ logarithmic time. Since Binary Search requires a sorted collection, the catalog is automatically sorted by title first.
 
-### 4. Catalog Sorting (Bubble Sort) — **Student 4**
-* **Class**: `CatalogSorter`
-* **Purpose**: Sorts the catalog list alphabetically by **Title** or **Artist** on the Dashboard.
-* **Why Bubble Sort**: Implements an in-place sorting routine that satisfies the sorting precondition required for Binary Search.
+### 4. Recommendation Graph — **Student 4**
+* **Class**: `RecommendationGraph` / `GraphNode`
+* **Purpose**: Recommends similar songs based on connected tracks.
+* **Why Graph**: Uses an Adjacency List graph structure to model non-linear connections between tracks and fetch recommendations in $O(1)$ lookup time.
 
 ---
 
