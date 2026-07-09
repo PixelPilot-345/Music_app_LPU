@@ -1,27 +1,41 @@
-# Student 2 Report: Play Queue using a FIFO Queue
+# Student 2 Report: Play Queue using a FIFO Queue & Playback Automation
 
 ## 1. What This Part Accomplishes
-This module implements a dynamic playback queue, allowing users to stage multiple songs to be played sequentially in the future (a "play next" queue).
+This module implements a dynamic queue for staging upcoming tracks. It also coordinates the playback automation logic: playing the next song automatically when the current track ends.
 
-## 2. Why a Queue (FIFO) was Chosen
-* **First-In, First-Out (FIFO) Order**: A queue is the natural data structure for playback scheduling. The first song added to the queue should be the first song to play when the current track finishes.
-* **Separation of Concerns**: Staging upcoming songs in a dedicated queue keeps the primary playlist intact and allows on-the-fly custom ordering.
+## 2. Playback Automation Rule
+* **Priority Playback**: When the music player finishes playing a song (or when the user skips next), the app first checks if there are any songs staged in the **FIFO Queue**.
+* **Queue First, Then Playlist**:
+  * If the Queue is **not empty**, the top song is dequeued (`dequeue()`) and played.
+  * If the Queue is **empty**, the player automatically falls back to the **Playlist Doubly Linked List** and plays the next chronological track relative to the current position.
 
 ## 3. How the Code Works
 
-### Node Structure (`QueueNode`)
-A simple singly linked list node containing the `Song` data and a reference pointer to the `next` node:
+### Main Queue Operations (`PlayQueue`)
+* **`enqueue(Song s)`**: Adds a new song to the tail of the queue.
+* **`dequeue()`**: Retrieves and removes the song at the head of the queue.
+
+### Automation Controller (`playNext()`)
 ```java
-class QueueNode {
-    Song song;
-    QueueNode next;
-    public QueueNode(Song s) { song = s; }
+private void playNext() {
+    Song next = playQueue.dequeue();
+    if (next != null) {
+        currentPlayingNode = activePlaylist.findNode(next);
+        play(next);
+        refreshQueue();
+    } else {
+        if (activePlaylist.head == null) return;
+        if (currentPlayingNode == null) {
+            currentPlayingNode = activePlaylist.head;
+        } else {
+            currentPlayingNode = (currentPlayingNode.next != null) ? currentPlayingNode.next : activePlaylist.head;
+        }
+        if (currentPlayingNode != null) {
+            play(currentPlayingNode.song);
+        }
+    }
 }
 ```
-
-### Main Queue Operations (`PlayQueue`)
-* **`enqueue(Song s)`**: Adds a new song to the tail of the queue. If the queue is empty, both `head` and `tail` reference the new node. Otherwise, the old tail's `next` pointer is updated to the new node, and the `tail` pointer is shifted.
-* **`dequeue()`**: Removes and returns the song at the head of the queue. The `head` pointer is moved to `head.next`. If the queue becomes empty, the `tail` pointer is reset to null.
 
 ## 4. Code Snippet
 ```java
@@ -36,8 +50,7 @@ class PlayQueue {
     
     public Song dequeue() {
         if (head == null) return null;
-        Song s = head.song; 
-        head = head.next;
+        Song s = head.song; head = head.next;
         if (head == null) tail = null;
         return s;
     }

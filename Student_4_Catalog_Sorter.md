@@ -1,11 +1,11 @@
 # Student 4 Report: Catalog Sorting using a Custom Bubble Sort Algorithm
 
 ## 1. What This Part Accomplishes
-This module handles sorting and organizing the song catalog on the main Dashboard. It allows users to dynamically sort the library of available songs by **Title** or **Artist** on demand.
+This module manages sorting options for the song catalog on the main Dashboard. It allows users to sort the catalog list alphabetically by **Title** or **Artist**, and acts as a direct helper for the **Binary Search** system.
 
 ## 2. Why Bubble Sort was Chosen
-* **In-Place Sorting**: Bubble Sort works by comparing adjacent elements and swapping them if they are in the wrong order. It requires $O(1)$ extra space, sorting the catalog directly inside the existing song list.
-* **Educational & Easy to Explain**: As one of the foundational sorting algorithms taught in computer science curricula, it is highly appropriate for college student presentations and demonstrates clear, manual algorithmic iteration logic.
+* **In-Place Sorting**: Bubble Sort compares adjacent items and swaps them in place. It requires $O(1)$ auxiliary memory space, editing the catalog list directly.
+* **Coordination with Search**: To search using Binary Search (Student 3's part), the collection must be sorted. The Bubble Sort implementation guarantees the sorting prerequisite is satisfied.
 
 ## 3. How the Code Works
 
@@ -13,13 +13,8 @@ This module handles sorting and organizing the song catalog on the main Dashboar
 * **`sortByTitle(List<Song>)`**:
   * Traverses the list and compares the `title` field of adjacent elements using `compareToIgnoreCase()`.
   * If the left element is alphabetically greater than the right element, they are swapped.
-  * Repeats this process until the entire list is fully sorted.
 * **`sortByArtist(List<Song>)`**:
-  * Employs the identical sorting loop structure, but compares the `artist` field of the song objects instead.
-
-### Dashboard UI Integration
-* Adds two control buttons to the Dashboard panel: **By Title** and **By Artist**.
-* Invokes `CatalogSorter.sortByTitle(catalog)` or `CatalogSorter.sortByArtist(catalog)` upon action triggers, then calls `refreshDashboardList()` to refresh the dashboard list visual elements.
+  * Traverses the list and compares the `artist` field of adjacent elements, swapping them if they are in the wrong order.
 
 ## 4. Code Snippet
 ```java

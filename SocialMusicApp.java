@@ -5,8 +5,6 @@ import java.awt.event.*;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.HashMap;
-import java.util.Map;
 import javax.sound.sampled.*;
 
 // ==========================================
@@ -44,6 +42,13 @@ class PlaylistDLL {
                 return;
             }
         }
+    }
+    public DLLNode findNode(Song s) {
+        if (s == null) return null;
+        for (DLLNode c = head; c != null; c = c.next) {
+            if (c.song.id == s.id) return c;
+        }
+        return null;
     }
     private void swap(DLLNode a, DLLNode b) { Song t = a.song; a.song = b.song; b.song = t; }
     public void moveUp(Song s) {
@@ -88,26 +93,18 @@ class PlayQueue {
     }
 }
 
-// Student 3: Custom Graph for Recommendations
-class GraphNode {
-    Song song; List<Song> neighbors = new ArrayList<>();
-    public GraphNode(Song s) { song = s; }
-}
-class RecommendationGraph {
-    Map<Integer, GraphNode> nodes = new HashMap<>();
-    public void addSong(Song s) { nodes.putIfAbsent(s.id, new GraphNode(s)); }
-    public void addConnection(Song s1, Song s2) {
-        addSong(s1); addSong(s2);
-        if (!nodes.get(s1.id).neighbors.contains(s2)) nodes.get(s1.id).neighbors.add(s2);
-        if (!nodes.get(s2.id).neighbors.contains(s1)) nodes.get(s2.id).neighbors.add(s1);
-    }
-    public List<Song> getRecommendations(Song s) {
-        return nodes.containsKey(s.id) ? nodes.get(s.id).neighbors : new ArrayList<>();
-    }
-    public List<Song> getAllSongs() {
-        List<Song> all = new ArrayList<>();
-        for (GraphNode n : nodes.values()) all.add(n.song);
-        return all;
+// Student 3: Binary Search for Catalog
+class BinarySearch {
+    public static int searchByTitle(List<Song> list, String query) {
+        int low = 0, high = list.size() - 1;
+        while (low <= high) {
+            int mid = (low + high) / 2;
+            int cmp = list.get(mid).title.compareToIgnoreCase(query);
+            if (cmp == 0) return mid;
+            else if (cmp < 0) low = mid + 1;
+            else high = mid - 1;
+        }
+        return -1;
     }
 }
 
@@ -195,53 +192,6 @@ class AudioVisualizerPanel extends JPanel {
     }
 }
 
-class GraphVisualizerPanel extends JPanel {
-    private RecommendationGraph graph;
-    private java.util.function.Consumer<Song> onClick;
-    private Song sel, play;
-    private Map<Song, Point> pos = new HashMap<>();
-    public GraphVisualizerPanel(RecommendationGraph g, java.util.function.Consumer<Song> click) {
-        graph = g; onClick = click; setBackground(new Color(40, 44, 56));
-        addMouseListener(new MouseAdapter() {
-            public void mouseClicked(MouseEvent e) {
-                for (Map.Entry<Song, Point> entry : pos.entrySet()) {
-                    if (e.getPoint().distance(entry.getValue()) < 15) {
-                        sel = entry.getKey(); onClick.accept(sel); repaint(); break;
-                    }
-                }
-            }
-        });
-    }
-    public void update(Song s, Song p) { sel = s; play = p; repaint(); }
-    protected void paintComponent(Graphics g) {
-        super.paintComponent(g); Graphics2D g2 = (Graphics2D) g;
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        List<Song> songs = graph.getAllSongs(); if (songs.isEmpty()) return;
-        int cx = getWidth()/2, cy = getHeight()/2;
-        pos.clear();
-        for (int i = 0; i < songs.size(); i++) {
-            double a = (2.0 * Math.PI * i) / songs.size();
-            pos.put(songs.get(i), new Point(cx + (int)(95*Math.cos(a)), cy + (int)(95*Math.sin(a))));
-        }
-        g2.setColor(new Color(90, 95, 115));
-        for (Song s : songs) {
-            Point p1 = pos.get(s);
-            for (Song n : graph.getRecommendations(s)) {
-                Point p2 = pos.get(n);
-                if (p2 != null) g2.drawLine(p1.x, p1.y, p2.x, p2.y);
-            }
-        }
-        for (Song s : songs) {
-            Point p = pos.get(s);
-            g2.setColor(s == play ? new Color(46, 204, 113) : (s == sel ? new Color(52, 152, 219) : new Color(124, 77, 255)));
-            g2.fillOval(p.x - 10, p.y - 10, 20, 20);
-            g2.setColor(Color.WHITE); g2.drawOval(p.x - 10, p.y - 10, 20, 20);
-            g2.setFont(new Font("Segoe UI", Font.PLAIN, 10));
-            g2.drawString(s.title, p.x + 12, p.y + 5);
-        }
-    }
-}
-
 // ==========================================
 // 4. MAIN WINDOW APP GUI
 // ==========================================
@@ -257,17 +207,17 @@ public class SocialMusicApp extends JFrame {
     private List<Song> catalog = new ArrayList<>();
     private PlaylistDLL activePlaylist = new PlaylistDLL();
     private PlayQueue playQueue = new PlayQueue();
-    private RecommendationGraph recGraph = new RecommendationGraph();
 
     private SongWavPlayer player;
     private CardLayout cardLayout = new CardLayout();
     private JPanel contentPanel = new JPanel(cardLayout);
-    private Song selectedSong, selectedGraphSong;
+    private Song selectedSong;
+    private DLLNode currentPlayingNode = null;
 
     private JLabel lblSelTitle, lblSelArtist, lblSelGenre;
+    private JLabel lblTitle;
+    private JButton btnPlayPause;
     private DefaultTableModel playlistModel, queueModel;
-    private GraphVisualizerPanel graphPanel;
-    private DefaultListModel<Song> recListModel = new DefaultListModel<>();
     private DefaultListModel<Song> dashboardListModel = new DefaultListModel<>();
     private JComboBox<String> fF;
 
@@ -278,7 +228,7 @@ public class SocialMusicApp extends JFrame {
         setLocationRelativeTo(null);
         
         initData();
-        player = new SongWavPlayer(this::playNextFromQueue);
+        player = new SongWavPlayer(this::playNext);
 
         setLayout(new BorderLayout());
         add(createSidebar(), BorderLayout.WEST);
@@ -288,11 +238,9 @@ public class SocialMusicApp extends JFrame {
         contentPanel.add(createDashboard(), "DASHBOARD");
         contentPanel.add(createPlaylist(), "PLAYLIST");
         contentPanel.add(createQueuePanel(), "QUEUE");
-        contentPanel.add(createRecView(), "REC");
 
         if (!catalog.isEmpty()) {
             selectSong(catalog.get(0));
-            selectedGraphSong = catalog.get(0);
         }
         setVisible(true);
     }
@@ -348,14 +296,6 @@ public class SocialMusicApp extends JFrame {
             catalog.add(new Song(3, "Jazz Piano Loop", "Dave Brubeck", "Jazz", "sample-9s.wav"));
         }
 
-        for (Song s : catalog) recGraph.addSong(s);
-        for (int i = 0; i < catalog.size(); i++) {
-            recGraph.addConnection(catalog.get(i), catalog.get((i+1)%catalog.size()));
-            if (catalog.size() > 3) {
-                recGraph.addConnection(catalog.get(i), catalog.get((i+3)%catalog.size()));
-            }
-        }
-        
         for (int i = 0; i < Math.min(3, catalog.size()); i++) {
             activePlaylist.add(catalog.get(i));
         }
@@ -377,8 +317,8 @@ public class SocialMusicApp extends JFrame {
         title.setBorder(BorderFactory.createEmptyBorder(20,15,20,15));
         p.add(title);
 
-        String[] items = {"Dashboard", "DLL Playlist", "FIFO Queue", "Recommendations"};
-        String[] cards = {"DASHBOARD", "PLAYLIST", "QUEUE", "REC"};
+        String[] items = {"Dashboard", "DLL Playlist", "FIFO Queue"};
+        String[] cards = {"DASHBOARD", "PLAYLIST", "QUEUE"};
         for (int i = 0; i < items.length; i++) {
             final String card = cards[i];
             JButton btn = new JButton(items[i]);
@@ -391,7 +331,6 @@ public class SocialMusicApp extends JFrame {
                 cardLayout.show(contentPanel, card);
                 if (card.equals("PLAYLIST")) refreshPlaylist();
                 if (card.equals("QUEUE")) refreshQueue();
-                if (card.equals("REC")) graphPanel.update(selectedGraphSong, player.getCurrentSong());
             });
             p.add(btn); p.add(Box.createVerticalStrut(5));
         }
@@ -427,8 +366,10 @@ public class SocialMusicApp extends JFrame {
         
         JPanel center = new JPanel(new BorderLayout(5, 5)); center.setOpaque(false);
         
-        JPanel topSortPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0)); topSortPanel.setOpaque(false);
-        JLabel lblSort = new JLabel("Sort Catalog:"); styleLabel(lblSort, new Font("Segoe UI", Font.BOLD, 12), COLOR_TEXT);
+        JPanel topPanel = new JPanel(new BorderLayout(5, 5)); topPanel.setOpaque(false);
+
+        JPanel topSortPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0)); topSortPanel.setOpaque(false);
+        JLabel lblSort = new JLabel("Sort:"); styleLabel(lblSort, new Font("Segoe UI", Font.BOLD, 12), COLOR_TEXT);
         JButton btnSortTitle = new JButton("By Title"); styleBtn(btnSortTitle);
         JButton btnSortArtist = new JButton("By Artist"); styleBtn(btnSortArtist);
         
@@ -443,17 +384,53 @@ public class SocialMusicApp extends JFrame {
         
         topSortPanel.add(lblSort); topSortPanel.add(btnSortTitle); topSortPanel.add(btnSortArtist);
         
-        center.add(topSortPanel, BorderLayout.NORTH); center.add(new JScrollPane(list), BorderLayout.CENTER);
-        
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 5)); bottom.setOpaque(false);
-        JButton btnAddQ = new JButton("Add to Play Queue"); styleBtn(btnAddQ);
-        btnAddQ.addActionListener(e -> {
-            if (list.getSelectedValue() != null) {
-                playQueue.enqueue(list.getSelectedValue());
-                JOptionPane.showMessageDialog(this, "Added to Play Queue!");
+        JPanel searchPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0)); searchPanel.setOpaque(false);
+        JTextField txtSearch = new JTextField(8);
+        JButton btnSearch = new JButton("Search"); styleBtn(btnSearch);
+        btnSearch.addActionListener(e -> {
+            String q = txtSearch.getText().trim();
+            if (!q.isEmpty()) {
+                CatalogSorter.sortByTitle(catalog);
+                refreshDashboardList();
+                int idx = BinarySearch.searchByTitle(catalog, q);
+                if (idx >= 0) {
+                    list.setSelectedIndex(idx);
+                    list.ensureIndexIsVisible(idx);
+                    selectSong(catalog.get(idx));
+                    JOptionPane.showMessageDialog(this, "Found: " + catalog.get(idx).title);
+                } else {
+                    JOptionPane.showMessageDialog(this, "Song not found!");
+                }
             }
         });
-        bottom.add(btnAddQ);
+        searchPanel.add(txtSearch); searchPanel.add(btnSearch);
+
+        topPanel.add(topSortPanel, BorderLayout.WEST);
+        topPanel.add(searchPanel, BorderLayout.EAST);
+        
+        center.add(topPanel, BorderLayout.NORTH); center.add(new JScrollPane(list), BorderLayout.CENTER);
+        
+        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5)); bottom.setOpaque(false);
+        JButton btnAddPlaylist = new JButton("Add to Playlist"); styleBtn(btnAddPlaylist);
+        JButton btnAddQ = new JButton("Add to Play Queue"); styleBtn(btnAddQ);
+        
+        btnAddPlaylist.addActionListener(e -> {
+            Song s = list.getSelectedValue();
+            if (s != null) {
+                activePlaylist.add(s);
+                JOptionPane.showMessageDialog(this, "Added to DLL Playlist!");
+            }
+        });
+        
+        btnAddQ.addActionListener(e -> {
+            Song s = list.getSelectedValue();
+            if (s != null) {
+                playQueue.enqueue(s);
+                JOptionPane.showMessageDialog(this, "Added to FIFO Play Queue!");
+            }
+        });
+        
+        bottom.add(btnAddPlaylist); bottom.add(btnAddQ);
         center.add(bottom, BorderLayout.SOUTH);
         
         p.add(center, BorderLayout.CENTER);
@@ -497,7 +474,7 @@ public class SocialMusicApp extends JFrame {
         addBtn.addActionListener(e -> {
             if (fT.getText().isEmpty() || fA.getText().isEmpty()) return;
             Song s = new Song(catalog.size()+1, fT.getText(), fA.getText(), fG.getText(), (String)fF.getSelectedItem());
-            catalog.add(s); recGraph.addSong(s); activePlaylist.add(s); refreshPlaylist();
+            catalog.add(s); activePlaylist.add(s); refreshPlaylist();
             refreshDashboardList();
             fT.setText(""); fA.setText(""); fG.setText("");
         });
@@ -527,47 +504,44 @@ public class SocialMusicApp extends JFrame {
 
         JPanel controls = new JPanel(new FlowLayout(FlowLayout.RIGHT)); controls.setOpaque(false);
         JButton dequeueBtn = new JButton("Play Next in Queue"); styleBtn(dequeueBtn);
-        dequeueBtn.addActionListener(e -> playNextFromQueue());
+        dequeueBtn.addActionListener(e -> playNext());
         controls.add(dequeueBtn);
         p.add(controls, BorderLayout.SOUTH);
         return p;
     }
 
-    private JPanel createRecView() {
-        JPanel p = new JPanel(new BorderLayout(10, 10)); p.setBackground(COLOR_BG);
-        graphPanel = new GraphVisualizerPanel(recGraph, s -> {
-            selectedGraphSong = s; recListModel.clear();
-            for (Song r : recGraph.getRecommendations(s)) recListModel.addElement(r);
-        });
-        p.add(graphPanel, BorderLayout.CENTER);
-
-        JPanel side = new JPanel(new BorderLayout(5, 5)); side.setBackground(COLOR_PANEL); side.setPreferredSize(new Dimension(180, 400));
-        side.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        JList<Song> rl = new JList<>(recListModel); rl.setBackground(COLOR_PANEL); rl.setForeground(COLOR_TEXT);
-        rl.setSelectionBackground(COLOR_ACCENT);
-        JButton playRec = new JButton("Play Recommended"); styleBtn(playRec);
-        playRec.addActionListener(e -> { if (rl.getSelectedValue()!=null) play(rl.getSelectedValue()); });
-        
-        JLabel lRec = new JLabel("Recommendations:"); styleLabel(lRec, new Font("Segoe UI", Font.BOLD, 12), COLOR_TEXT);
-        side.add(lRec, BorderLayout.NORTH); side.add(new JScrollPane(rl), BorderLayout.CENTER); side.add(playRec, BorderLayout.SOUTH);
-        p.add(side, BorderLayout.EAST);
-        return p;
-    }
-
     private JPanel createBottomBar() {
-        JPanel p = new JPanel(new BorderLayout(10, 5)); p.setBackground(COLOR_SIDEBAR);
+        JPanel p = new JPanel(new BorderLayout(15, 5)); p.setBackground(COLOR_SIDEBAR);
         p.setBorder(BorderFactory.createEmptyBorder(10, 15, 10, 15));
         
-        JLabel lblTitle = new JLabel("Not Playing"); styleLabel(lblTitle, new Font("Segoe UI", Font.BOLD, 13), COLOR_TEXT);
+        lblTitle = new JLabel("Not Playing"); styleLabel(lblTitle, new Font("Segoe UI", Font.BOLD, 13), COLOR_TEXT);
         p.add(lblTitle, BorderLayout.WEST);
 
-        JButton playBtn = new JButton("Play/Pause"); styleBtn(playBtn);
-        playBtn.setBackground(COLOR_ACCENT);
-        playBtn.addActionListener(e -> {
-            if (player.getCurrentSong() != null) { player.stop(); lblTitle.setText("Stopped"); }
-            else if (selectedSong != null) play(selectedSong);
+        JPanel centerControls = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0)); centerControls.setOpaque(false);
+        JButton btnPrev = new JButton("⏮ Previous"); styleBtn(btnPrev);
+        btnPlayPause = new JButton("Play/Pause"); styleBtn(btnPlayPause);
+        btnPlayPause.setBackground(COLOR_ACCENT);
+        JButton btnNext = new JButton("Next ⏭"); styleBtn(btnNext);
+
+        btnPlayPause.addActionListener(e -> {
+            Song cur = player.getCurrentSong();
+            if (cur != null) {
+                player.stop();
+                lblTitle.setText("Stopped");
+                btnPlayPause.setText("Play");
+            } else if (selectedSong != null) {
+                play(selectedSong);
+            }
         });
-        p.add(playBtn, BorderLayout.CENTER);
+
+        btnPrev.addActionListener(e -> playPrevious());
+        btnNext.addActionListener(e -> playNext());
+
+        centerControls.add(btnPrev);
+        centerControls.add(btnPlayPause);
+        centerControls.add(btnNext);
+        
+        p.add(centerControls, BorderLayout.CENTER);
         p.add(new AudioVisualizerPanel(player), BorderLayout.EAST);
         return p;
     }
@@ -579,23 +553,42 @@ public class SocialMusicApp extends JFrame {
     }
 
     private void play(Song s) {
+        if (s == null) return;
         player.play(s);
-        graphPanel.update(selectedGraphSong, s);
+        currentPlayingNode = activePlaylist.findNode(s);
+        lblTitle.setText("Playing: " + s.title);
+        btnPlayPause.setText("Pause");
     }
 
-    private void playNextFromQueue() {
-        Song next = playQueue.dequeue();
-        if (next == null) {
-            List<Song> list = activePlaylist.toList(); if (list.isEmpty()) return;
-            int nextIdx = 0; Song cur = player.getCurrentSong();
-            if (cur != null) {
-                for (int i=0; i<list.size(); i++) {
-                    if (list.get(i).id == cur.id) { nextIdx = (i+1)%list.size(); break; }
-                }
-            }
-            next = list.get(nextIdx);
+    private void playPrevious() {
+        if (activePlaylist.head == null) return;
+        if (currentPlayingNode == null) {
+            currentPlayingNode = activePlaylist.tail;
+        } else {
+            currentPlayingNode = (currentPlayingNode.prev != null) ? currentPlayingNode.prev : activePlaylist.tail;
         }
-        play(next); refreshQueue();
+        if (currentPlayingNode != null) {
+            play(currentPlayingNode.song);
+        }
+    }
+
+    private void playNext() {
+        Song next = playQueue.dequeue();
+        if (next != null) {
+            currentPlayingNode = activePlaylist.findNode(next);
+            play(next);
+            refreshQueue();
+        } else {
+            if (activePlaylist.head == null) return;
+            if (currentPlayingNode == null) {
+                currentPlayingNode = activePlaylist.head;
+            } else {
+                currentPlayingNode = (currentPlayingNode.next != null) ? currentPlayingNode.next : activePlaylist.head;
+            }
+            if (currentPlayingNode != null) {
+                play(currentPlayingNode.song);
+            }
+        }
     }
 
     private void refreshPlaylist() {
