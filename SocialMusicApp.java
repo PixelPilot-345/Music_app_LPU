@@ -258,45 +258,69 @@ public class SocialMusicApp extends JFrame {
     }
 
     private void initData() {
+        String[][] dummyData = {
+            {"Blinding Lights", "The Weeknd", "Pop", "sample-3s.wav"},
+            {"Shape of You", "Ed Sheeran", "Pop", "sample-6s.wav"},
+            {"Bohemian Rhapsody", "Queen", "Rock", "overdrive.wav"},
+            {"Stay", "Kid LAROI & Justin Bieber", "Pop", "sample-9s.wav"},
+            {"Hotel California", "Eagles", "Rock", "gc.wav"},
+            {"Bad Guy", "Billie Eilish", "Alternative", "synth.wav"},
+            {"Someone Like You", "Adele", "Pop", "voice.wav"},
+            {"Stairway to Heaven", "Led Zeppelin", "Rock", "gc.wav"},
+            {"Perfect", "Ed Sheeran", "Pop", "voice-note.wav"},
+            {"Smells Like Teen Spirit", "Nirvana", "Rock", "overdrive.wav"},
+            {"Rolling in the Deep", "Adele", "Pop", "voice.wav"},
+            {"Blinding Synth", "Retro Beats", "Synthwave", "synth.wav"},
+            {"Ocean Breeze", "Nature Sounds", "Ambient", "noise.wav"},
+            {"City Traffic Jam", "Urban Effects", "Sound Effect", "car-horn.wav"},
+            {"Sine Wave Tone", "Lab Signal", "Electronic", "sine.wav"},
+            {"Acoustic Solo", "Gary Clark", "Acoustic", "gc.wav"}
+        };
+
         File folder = new File("songs");
-        File[] files = folder.listFiles((dir, name) -> name.toLowerCase().endsWith(".wav"));
+        List<String> foundFiles = new ArrayList<>();
+        if (folder.exists() && folder.isDirectory()) {
+            File[] files = folder.listFiles((dir, name) -> name.toLowerCase().endsWith(".wav"));
+            if (files != null) {
+                for (File f : files) foundFiles.add(f.getName());
+            }
+        }
+
         int id = 1;
-        
-        if (files != null) {
-            for (File f : files) {
-                String name = f.getName();
-                String title = name.substring(0, name.lastIndexOf('.'));
+        for (String[] songData : dummyData) {
+            String title = songData[0];
+            String artist = songData[1];
+            String genre = songData[2];
+            String filename = songData[3];
+            if (foundFiles.contains(filename)) {
+                catalog.add(new Song(id++, title, artist, genre, filename));
+            }
+        }
+
+        for (String filename : foundFiles) {
+            boolean loaded = false;
+            for (Song s : catalog) {
+                if (s.filename.equals(filename)) { loaded = true; break; }
+            }
+            if (!loaded) {
+                String title = filename.substring(0, filename.lastIndexOf('.'));
                 title = title.replace('-', ' ').replace('_', ' ');
-                
                 String[] words = title.split(" ");
                 StringBuilder sb = new StringBuilder();
                 for (String w : words) {
                     if (!w.isEmpty()) sb.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1)).append(" ");
                 }
-                title = sb.toString().trim();
-                
-                String artist = "Local Artist";
-                String genre = "Sound";
-                if (name.contains("sample")) { artist = "Sample Lab"; genre = "Electronic"; }
-                else if (name.equals("gc.wav")) { artist = "Gary Clark"; genre = "Country"; }
-                else if (name.equals("synth.wav")) { artist = "Stellar Noise"; genre = "Synth"; }
-                else if (name.equals("voice.wav") || name.equals("voice-note.wav")) { artist = "Vocal Choir"; genre = "Vocal"; }
-                else if (name.equals("noise.wav")) { artist = "Relaxing Frequency"; genre = "Ambient"; }
-                else if (name.equals("sine.wav")) { artist = "Lab Oscillator"; genre = "Tone"; }
-                else if (name.equals("overdrive.wav")) { artist = "Guitar Hero"; genre = "Rock"; }
-                else if (name.equals("car-horn.wav")) { artist = "Traffic Jam"; genre = "Urban"; }
-
-                catalog.add(new Song(id++, title, artist, genre, name));
+                catalog.add(new Song(id++, sb.toString().trim(), "Local Artist", "Sound", filename));
             }
         }
-        
+
         if (catalog.isEmpty()) {
             catalog.add(new Song(1, "Summer Beat Loop", "Synth Master", "Pop", "sample-3s.wav"));
             catalog.add(new Song(2, "Synthwave Rhythm", "Retro Wave", "Rock", "sample-6s.wav"));
             catalog.add(new Song(3, "Jazz Piano Loop", "Dave Brubeck", "Jazz", "sample-9s.wav"));
         }
 
-        for (int i = 0; i < Math.min(3, catalog.size()); i++) {
+        for (int i = 0; i < Math.min(4, catalog.size()); i++) {
             activePlaylist.add(catalog.get(i));
         }
 
