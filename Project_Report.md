@@ -56,7 +56,7 @@ Commercial audio players rely on complex libraries and default collection APIs. 
 ## 4. Project Modules & Team Roles
 * **Module 1: Doubly Linked List Playlist Management (Student 1)**: Responsible for the playlist structures, element insertion/deletion, position adjustments, and track skipping hooks.
 * **Module 2: FIFO Queue & Playback Automation (Student 2)**: Responsible for play queue structures and coordinate the auto-play progression thread when a track ends.
-* **Module 3: Song Search (Student 3)**: Responsible for the sorted catalog search and layout matching.
+* **Module 3: Song Search (Student 3)**: Responsible for the sorted catalog search, JList highlights, auto-scrolling viewport, and layout matching.
 * **Module 4: Recommendation Engine (Student 4)**: Responsible for establishing similarity links between tracks in the Graph database and populating recommendations.
 
 ---
@@ -74,28 +74,49 @@ Commercial audio players rely on complex libraries and default collection APIs. 
 
 ### Module 1: Playlist Management (Doubly Linked List) — Student 1
 This module controls the active playlist table. By utilizing prev and next nodes, it handles track skips and reordering.
-* **Key Operations**:
-  * `add(Song s)`: Appends song to playlist tail in $O(1)$ time.
-  * `remove(Song s)`: Unlinks track node by correcting adjacent neighbors.
-  * `moveUp(Song s)` / `moveDown(Song s)`: Swaps data positions to reorder tracks.
+* **UI/UX Integration**:
+  * **The DLL Playlist View**: Renders the active playlist in a custom-styled dark-themed `JTable`.
+  * **Track Reordering**: Provides "Move Up" and "Move Down" buttons that swap adjacent node values in the DLL. The JTable reflects the updated order instantly, letting users easily reorganize their tracks.
+  * **Interactive Playlist Controls**:
+    * **Play Button**: Triggers the audio stream for the selected song in the playlist.
+    * **Remove Button**: Unlinks the selected song from the list and refreshes the table row layout.
+    * **Quick Add Selector**: A `JComboBox<Song>` allows users to select any song from the global catalog and append it to the DLL.
+    * **Sidebar Notification Badge**: Dynamically displays the size of the playlist as `DLL Playlist (N)`.
 
 ### Module 2: Play Queue & Automation — Student 2
 Stages pending tracks in a queue. Integrates automatic transition logic:
-* **Playback Automation Algorithm**:
-  1. On song end: checks if the Play Queue has elements.
-  2. If yes: dequeues and plays it.
-  3. If no: advances to the next track in the Playlist DLL.
+* **UI/UX Integration**:
+  * **The FIFO Queue View**: Shows upcoming tracks in their exact play order.
+  * **Staging Controls**: Includes an "Add to Queue" button on the Dashboard and a "Quick Add" dropdown selector inside the Queue panel to push tracks onto the tail of the play queue.
+  * **Playback Automation**: Automatically polls the queue when a track ends. If populated, it dequeues the head song and plays it immediately. If empty, it falls back to the active Playlist DLL to continue playing.
+  * **Sidebar Badge**: Real-time counter badge `FIFO Queue (N)` updates whenever a song is enqueued or dequeued.
 
-### Module 3: Song Search — Student 3
+### Module 3: Song Search (Binary Search) — Student 3
 Performs binary search lookup on the catalog list.
-* **Algorithm**:
-  * Compares query with midpoint. Moves search boundaries accordingly to finish lookup in $O(\log N)$ steps.
+* **Detailed Algorithmic Mechanics**:
+  * Binary Search uses a divide-and-conquer strategy to locate a target item in logarithmic $O(\log N)$ time.
+  * **The Sorting Precondition**: Because Binary Search splits the search space in half by comparing with a midpoint, it requires the search space to be sorted.
+  * **The Search Flow**:
+    1. When the user types a search query in `txtSearch` and clicks the "Search" button, the event handler first sorts the `catalog` list alphabetically by title:
+       `catalog.sort((a, b) -> a.title.compareToIgnoreCase(b.title));`
+    2. The Dashboard `JList` updates to reflect this sorted order.
+    3. The binary search starts lookups. It computes the midpoint `mid = (low + high) / 2`.
+    4. If the song at the `mid` index matches the query (case-insensitive), it returns `mid`.
+    5. If the target query is lexicographically larger than the midpoint song title, `low` is moved to `mid + 1`. Otherwise, `high` is moved to `mid - 1`.
+    6. If no match is found, it returns `-1`.
+  * **UI/UX Selection & Scrolling**:
+    * If a match is found (index $\ge 0$), the GUI updates the Dashboard list selection: `list.setSelectedIndex(idx)`.
+    * It automatically scrolls the list viewport to make the highlighted selection visible: `list.ensureIndexIsVisible(idx)`.
+    * The song preview card updates immediately.
+    * A success message box pops up confirming: `Found: [Song Title]`.
+    * The user can then click the "PLAY NOW" button or add the track to the playlist/queue.
 
 ### Module 4: Recommendations (Adjacency List Graph) — Student 4
 Builds an undirected Graph mapping song connections.
-* **Key Operations**:
-  * `addConnection(s1, s2)`: Connects two song nodes.
-  * `getRecommendations(s)`: Fetches neighbor nodes in $O(1)$ lookup time.
+* **UI/UX Integration**:
+  * **The Recommendations Tab**: Displays dynamic recommendations based on connections in the graph.
+  * **Dynamic Synchronization**: Selecting a song on the Dashboard or playing a track triggers `updateRecommendations(...)` to load all adjacent neighbor nodes of that track.
+  * **Immediate Exploration**: Clicking "Play Selected Recommendation" starts playback of the suggested track and recalculates recommendations for the new song on the fly.
 
 ---
 
