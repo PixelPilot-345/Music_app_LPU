@@ -1,7 +1,0 @@
-*.class
-*.log
-.project
-.classpath
-.settings/
-.vscode/
-bin/
